@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Sucursales — Gestión Vehicular{% endblock %}
+{% block contenido %}
+<h1>Sucursales</h1>
+
+<div class="tabla-wrap">
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Nombre</th><th>Ciudad</th><th>Estado</th><th>Responsable</th><th>Teléfono</th></tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.id }}</td><td>{{ f.nombre }}</td><td>{{ f.ciudad or "-" }}</td>
+        <td>{{ f.estado or "-" }}</td><td>{{ f.responsable or "-" }}</td><td>{{ f.telefono or "-" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">Sin sucursales todavía.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Nueva sucursal</h2>
+<form method="post" class="panel form-grid">
+  <label>Nombre *<input type="text" name="nombre" required></label>
+  <label>Ciudad<input type="text" name="ciudad"></label>
+  <label>Estado<input type="text" name="estado"></label>
+  <label>Responsable<input type="text" name="responsable"></label>
+  <label>Teléfono<input type="text" name="telefono"></label>
+  <button type="submit" class="btn-primary">Crear sucursal</button>
+</form>
+{% endblock %}

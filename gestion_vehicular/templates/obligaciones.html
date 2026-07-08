@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block titulo %}Permisos y licencias — Gestión Vehicular{% endblock %}
+{% block contenido %}
+<h1>Derechos, permisos y licencias</h1>
+
+<form method="get" class="form-inline">
+  <label class="checkbox-inline">
+    <input type="checkbox" name="pendientes" value="1" {% if solo_pendientes %}checked{% endif %} onchange="this.form.submit()">
+    Solo pendientes
+  </label>
+</form>
+
+<div class="tabla-wrap">
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Tipo</th><th>Aplica a</th><th>Sucursal</th><th>Periodo</th><th>Vence</th><th>Monto</th><th>Pagado</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.id }}</td><td>{{ f.tipo }}</td><td>{{ f.placas or f.conductor or "-" }}</td>
+        <td>{{ f.sucursal or "-" }}</td><td>{{ f.periodo or "-" }}</td><td>{{ f.fecha_vencimiento }}</td>
+        <td>{{ f.monto | money }}</td>
+        <td>{{ "sí" if f.pagado else "no" }}</td>
+        <td>
+          {% if not f.pagado %}
+          <form method="post" action="{{ url_for('obligacion_pagar', obligacion_id=f.id) }}" style="margin:0;">
+            <button type="submit" class="btn-sm">Marcar pagada</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9">Sin registros.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Nuevo registro</h2>
+<p class="ayuda">Completá <strong>o</strong> el vehículo <strong>o</strong> el conductor, según corresponda al tipo.</p>
+<form method="post" class="panel form-grid">
+  <label>Tipo *
+    <select name="tipo" required>
+      <optgroup label="Del vehículo">
+        {% for clave, texto in tipos_vehiculo.items() %}<option value="{{ clave }}">{{ texto }}</option>{% endfor %}
+      </optgroup>
+      <optgroup label="Del conductor">
+        {% for clave, texto in tipos_conductor.items() %}<option value="{{ clave }}">{{ texto }}</option>{% endfor %}
+      </optgroup>
+    </select>
+  </label>
+  <label>Vehículo
+    <select name="vehiculo_id">
+      <option value="">-</option>
+      {% for v in vehiculos %}<option value="{{ v.id }}">{{ v.placas or ("#" + v.id|string) }} — {{ v.marca }} {{ v.modelo }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Conductor
+    <select name="conductor_id">
+      <option value="">-</option>
+      {% for c in conductores %}<option value="{{ c.id }}">{{ c.nombre }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Fecha de vencimiento *<input type="date" name="fecha_vencimiento" required></label>
+  <label>Periodo<input type="text" name="periodo" placeholder='ej. "2026"'></label>
+  <label>Monto<input type="number" name="monto" step="0.01" min="0"></label>
+  <label>Descripción<input type="text" name="descripcion"></label>
+  <label class="checkbox-inline">
+    <input type="checkbox" name="pagado" value="1"> Ya está pagado
+  </label>
+  <label style="grid-column:1/-1;">Notas<textarea name="notas"></textarea></label>
+  <button type="submit" class="btn-primary">Registrar</button>
+</form>
+{% endblock %}

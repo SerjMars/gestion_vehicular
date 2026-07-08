@@ -1,0 +1,3 @@
+# Solo hace falta para la interfaz web (python gv.py web / python app.py).
+# La línea de comandos funciona sin instalar nada de esto.
+Flask>=3.0

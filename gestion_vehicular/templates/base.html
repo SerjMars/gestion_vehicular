@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Gestión Vehicular{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <nav class="nav">
+    <span class="nav-marca">Gestión Vehicular</span>
+    <a href="{{ url_for('index') }}">Alertas</a>
+    <a href="{{ url_for('sucursales') }}">Sucursales</a>
+    <a href="{{ url_for('vehiculos') }}">Vehículos</a>
+    <a href="{{ url_for('conductores') }}">Conductores</a>
+    <a href="{{ url_for('mantenimientos') }}">Mantenimientos</a>
+    <a href="{{ url_for('obligaciones') }}">Permisos y licencias</a>
+    <a href="{{ url_for('exportar_pagina') }}">Exportar / Correo</a>
+  </nav>
+  <main class="main">
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% if mensajes %}
+        <div class="flashes">
+          {% for categoria, mensaje in mensajes %}
+            <div class="flash flash-{{ categoria }}">{{ mensaje }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block contenido %}{% endblock %}
+  </main>
+</body>
+</html>

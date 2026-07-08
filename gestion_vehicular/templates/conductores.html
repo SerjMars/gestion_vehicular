@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block titulo %}Conductores — Gestión Vehicular{% endblock %}
+{% block contenido %}
+<h1>Conductores</h1>
+
+<div class="tabla-wrap">
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Nombre</th><th>Sucursal</th><th>Licencia</th><th>Tipo</th><th>Vigencia</th><th>Teléfono</th></tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.id }}</td><td>{{ f.nombre }}</td><td>{{ f.sucursal or "-" }}</td>
+        <td>{{ f.num_licencia or "-" }}</td><td>{{ f.tipo_licencia or "-" }}</td>
+        <td>{{ f.vigencia_licencia or "-" }}</td><td>{{ f.telefono or "-" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7">Sin conductores todavía.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Nuevo conductor</h2>
+<form method="post" class="panel form-grid">
+  <label>Nombre *<input type="text" name="nombre" required></label>
+  <label>Sucursal
+    <select name="sucursal_id">
+      <option value="">Sin asignar</option>
+      {% for s in sucursales %}<option value="{{ s.id }}">{{ s.nombre }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Número de licencia<input type="text" name="num_licencia"></label>
+  <label>Tipo/categoría<input type="text" name="tipo_licencia" placeholder="ej. B"></label>
+  <label>Vigencia<input type="date" name="vigencia"></label>
+  <label>Teléfono<input type="text" name="telefono"></label>
+  <button type="submit" class="btn-primary">Crear conductor</button>
+</form>
+{% endblock %}

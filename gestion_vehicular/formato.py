@@ -142,11 +142,13 @@ def _tabla_html(encabezados: list[str], filas: list[list], colores: list[tuple[s
     )
 
 
-def render_alertas_html(a: dict) -> str:
-    """Arma el tablero de alertas como HTML, con colores según urgencia.
+def render_alertas_fragmento(a: dict) -> str:
+    """Arma el tablero de alertas como un fragmento HTML (sin <html>/<body>).
 
     Rojo = vencido, naranja = urgente (≤7 días o poco kilometraje restante),
-    ámbar = dentro del horizonte configurado pero sin apuro inmediato.
+    ámbar = dentro del horizonte configurado pero sin apuro inmediato. Lo usan
+    tanto el correo (envuelto por :func:`render_alertas_html`) como la página
+    web del tablero, para no duplicar el armado de las tablas.
     """
     obligaciones, mant_fecha, mant_km = a["obligaciones"], a["mant_fecha"], a["mant_km"]
     umbral_km = a["umbral_km"]
@@ -182,10 +184,6 @@ def render_alertas_html(a: dict) -> str:
     )
 
     return f"""\
-<!doctype html>
-<html>
-<body style="margin:0;padding:0;background:#f9fafb;">
-<div style="max-width:820px;margin:0 auto;padding:24px;font-family:Arial,Helvetica,sans-serif;">
   <h2 style="margin:0 0 4px;color:#111827;">Tablero de alertas — Flota</h2>
   <p style="margin:0 0 20px;color:#6b7280;font-size:13px;">
     Horizonte: {a['dias']} días · Umbral de mantenimiento: {a['umbral_km']:,} km
@@ -208,6 +206,17 @@ def render_alertas_html(a: dict) -> str:
     <span style="color:{COLOR_URGENTE};">■ urgente (≤7 días o poco kilometraje)</span> ·
     <span style="color:{COLOR_PROXIMO};">■ próximo</span>
   </p>
+"""
+
+
+def render_alertas_html(a: dict) -> str:
+    """Documento HTML completo del tablero de alertas, para enviarlo por correo."""
+    return f"""\
+<!doctype html>
+<html>
+<body style="margin:0;padding:0;background:#f9fafb;">
+<div style="max-width:820px;margin:0 auto;padding:24px;font-family:Arial,Helvetica,sans-serif;">
+{render_alertas_fragmento(a)}
 </div>
 </body>
 </html>

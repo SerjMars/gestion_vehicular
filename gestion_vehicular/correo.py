@@ -34,6 +34,15 @@ class CorreoNoConfigurado(RuntimeError):
     """Falta configuración obligatoria (host o destinatarios)."""
 
 
+def configurado() -> bool:
+    """True si hay suficiente configuración SMTP como para intentar un envío."""
+    try:
+        _config()
+        return True
+    except CorreoNoConfigurado:
+        return False
+
+
 def _config() -> dict:
     host = os.environ.get("GV_SMTP_HOST")
     destinatarios = [d.strip() for d in os.environ.get("GV_SMTP_TO", "").split(",") if d.strip()]

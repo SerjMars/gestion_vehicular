@@ -12,8 +12,16 @@ from datetime import date
 
 from . import repositorio as repo
 
-# Rubros disponibles y su etiqueta.
-RUBROS = ["sucursales", "vehiculos", "conductores", "mantenimientos", "permisos", "licencias"]
+# Rubros disponibles y su etiqueta legible (para la CLI y la interfaz web).
+RUBROS_ETIQUETAS = {
+    "sucursales": "Sucursales",
+    "vehiculos": "Vehículos",
+    "conductores": "Conductores",
+    "mantenimientos": "Mantenimientos",
+    "permisos": "Derechos y permisos (vehículos)",
+    "licencias": "Licencias (conductores)",
+}
+RUBROS = list(RUBROS_ETIQUETAS)
 
 
 def _sucursales(con):

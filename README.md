@@ -1,7 +1,7 @@
 # Gestión Vehicular
 
-Herramienta de línea de comandos para gestionar, sobre una flota distribuida en
-varias sucursales, tres cosas:
+Herramienta para gestionar, sobre una flota distribuida en varias sucursales,
+tres cosas:
 
 1. **Mantenimientos** de cada vehículo (por fecha y por kilometraje), tanto de
    combustión/híbridos como **eléctricos**.
@@ -9,47 +9,95 @@ varias sucursales, tres cosas:
    circulación, placas, seguro (terminología de México).
 3. **Licencias de conductores** y su vigencia.
 
-El corazón de la herramienta es el comando **`alertas`**: un tablero que te dice,
-de un vistazo, qué está vencido o por vencer en toda la flota, y que además
-puede **enviarse por correo**. La información se puede **exportar a CSV separada
-por rubro**.
+El corazón de la herramienta es el tablero de **alertas**: te dice, de un
+vistazo, qué está vencido o por vencer en toda la flota, y puede **enviarse por
+correo** (con colores según urgencia). La información se puede **exportar a
+CSV separada por rubro**.
 
-Está escrita en **Python + SQLite** sin dependencias externas (solo la librería
-estándar), y con la lógica separada de la interfaz para poder **migrarla a una
-app web** más adelante reutilizando la base de datos y el código de negocio.
+Tiene **dos formas de uso** sobre la misma base de datos:
+
+- **Interfaz web** (`python app.py`): pantallas y botones en el navegador.
+  Recomendada para el uso diario.
+- **Línea de comandos** (`python gv.py ...`): útil para automatizar (cron) o
+  para quien prefiera la terminal.
+
+Está escrita en **Python + SQLite**, con la lógica de negocio separada de las
+dos interfaces (`repositorio.py`) para que agregar más pantallas, reportes o
+usuarios a futuro no implique reescribir nada de la base.
 
 ---
 
 ## Requisitos
 
-- Python 3.10 o superior. No hay que instalar nada más.
+- Python 3.10 o superior.
+- Para la interfaz web: [Flask](https://flask.palletsprojects.com/) — instalar
+  con `pip install -r requirements.txt`. La línea de comandos no necesita nada
+  de esto.
 
 ## Puesta en marcha
 
 ```bash
-# 1. Crear la base de datos
+# 1. Instalar la dependencia de la interfaz web (una sola vez)
+pip install -r requirements.txt
+
+# 2. Crear la base de datos
 python gv.py init
 
-# 2. (Opcional) Cargar datos de ejemplo: 6 sucursales + Corporativo (con eléctricos)
+# 3. (Opcional) Cargar datos de ejemplo: 6 sucursales + Corporativo (con eléctricos)
 python gv.py seed
 
-# 3. Ver el tablero de alertas
-python gv.py alertas
+# 4. Abrir la interfaz web
+python app.py
+# → abrí http://127.0.0.1:5000 en tu navegador
 ```
 
-La base de datos se guarda por defecto en `~/gestion_vehicular.db`. Se puede
-cambiar con la variable de entorno `GV_DB` o con la opción `--db`:
+La base de datos se guarda por defecto en `~/gestion_vehicular.db` y la
+comparten la web y la línea de comandos. Se puede cambiar con la variable de
+entorno `GV_DB` o con la opción `--db`:
 
 ```bash
 python gv.py --db ./flota.db alertas
 GV_DB=/ruta/a/flota.db python gv.py alertas
+GV_DB=/ruta/a/flota.db python app.py
 ```
 
 > Todos los comandos aceptan `--help`, por ejemplo `python gv.py vehiculo add --help`.
 
 ---
 
+## Interfaz web
+
+```bash
+python app.py
+# equivalente:  python gv.py web
+```
+
+Se abre en **http://127.0.0.1:5000**, solo accesible desde tu propia
+computadora (no expone nada a la red). Tiene una pantalla por cada sección —
+Alertas, Sucursales, Vehículos, Conductores, Mantenimientos, Permisos y
+licencias, y Exportar/Correo — cada una con su tabla y su formulario de alta.
+Es la misma base de datos y la misma lógica que la línea de comandos: lo que
+cargás en una se ve al instante en la otra.
+
+Opciones del comando `web`:
+
+```bash
+python gv.py web --port 8080          # otro puerto
+python gv.py web --host 0.0.0.0       # accesible desde otras computadoras de tu red
+python gv.py web --debug              # recarga automática al editar el código
+```
+
+> `--host 0.0.0.0` sirve para que, por ejemplo, alguien de otra sucursal la
+> vea desde su navegador apuntando a tu IP en la red local. No tiene login
+> todavía, así que solo tiene sentido en una red de confianza (oficina); no la
+> expongas a internet así como está.
+
+---
+
 ## Uso diario
+
+Las siguientes secciones muestran los comandos equivalentes de línea de
+comandos; todo lo mismo se puede hacer con clicks desde la interfaz web.
 
 ### Sucursales
 
@@ -153,8 +201,9 @@ el horizonte configurado. Cada cliente de correo (Gmail, Outlook, etc.) muestra
 la versión que sepa interpretar; si alguno no soporta HTML, cae al texto plano.
 
 Para probar que la configuración SMTP funciona sin tener que esperar a que algo
-venza, hay un comando de prueba que manda un correo simple a los mismos
-destinatarios:
+venza, hay un botón **"Enviar correo de prueba"** en la pantalla
+**Exportar / Correo** de la interfaz web, que manda un correo simple a los
+destinatarios configurados. El mismo botón, en línea de comandos:
 
 ```bash
 python gv.py correo probar
@@ -187,23 +236,30 @@ Rubros: `sucursales`, `vehiculos`, `conductores`, `mantenimientos`, `permisos`
 ## Estructura del proyecto
 
 ```
-gv.py                       Punto de entrada (python gv.py ...)
+app.py                      Punto de entrada de la interfaz web (python app.py)
+gv.py                       Punto de entrada de la línea de comandos (python gv.py ...)
+requirements.txt            Solo Flask, y solo hace falta para la interfaz web
 gestion_vehicular/
 ├── db.py                   Conexión, esquema SQLite y migraciones
-├── repositorio.py          Acceso a datos + lógica de negocio (reutilizable)
+├── repositorio.py          Acceso a datos + lógica de negocio (compartida por web y CLI)
 │                           (incluye calcular_alertas)
 ├── catalogos.py            Terminología de México y tipos de mantenimiento (editable)
 ├── correo.py               Envío de alertas por correo (SMTP, texto + HTML) y correo de prueba
 ├── exportar.py             Exportación a CSV por rubro
+├── formato.py              Formato de tablas, montos y render del tablero (texto y HTML)
 ├── cli.py                  Interfaz de línea de comandos (presentación)
-├── formato.py              Formato de tablas, montos y render del tablero
+├── web.py                  Interfaz web con Flask (presentación)
+├── templates/               Páginas HTML de la interfaz web (Jinja2)
+├── static/style.css         Estilos de la interfaz web
 └── seed.py                 Datos de ejemplo (incluye flota eléctrica del Corporativo)
 ```
 
-La separación en capas es intencional: `db.py` y `repositorio.py` no imprimen ni
-saben de la consola, así que el día que quieras una **app web** (por ejemplo con
-Flask o FastAPI) reutilizás esos módulos y la misma base de datos, y solo
-reemplazás `cli.py` por las vistas web.
+La separación en capas es intencional: `db.py`, `repositorio.py`, `correo.py` y
+`exportar.py` no saben si quien los llama es la terminal o el navegador —
+`cli.py` y `web.py` son dos "vistas" delgadas sobre la misma lógica. Si más
+adelante hace falta que varias personas la usen a la vez desde la red (con
+usuarios y permisos por sucursal), el cambio se concentra en `web.py`, sin
+tocar el resto.
 
 ## Adaptar la terminología
 

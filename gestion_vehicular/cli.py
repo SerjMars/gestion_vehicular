@@ -38,6 +38,18 @@ def cmd_seed(con, args):
     print("Datos de ejemplo cargados. Probá:  python gv.py alertas")
 
 
+def cmd_web(con, args):
+    con.close()  # crear_app abre su propia conexión (una por cada request)
+    try:
+        from .web import crear_app
+    except ImportError:
+        print("Falta Flask. Instalalo con:  pip install -r requirements.txt", file=sys.stderr)
+        return 1
+    app = crear_app(args.db)
+    print(f"Interfaz web en http://{args.host}:{args.port}  (Ctrl+C para detener)")
+    app.run(host=args.host, port=args.port, debug=args.debug)
+
+
 # ---- Sucursales ---- #
 
 def cmd_sucursal_add(con, args):
@@ -250,6 +262,13 @@ def construir_parser() -> argparse.ArgumentParser:
     pco = sub.add_parser("correo", help="Utilidades de correo.").add_subparsers(dest="accion", required=True)
     a = pco.add_parser("probar", help="Envía un correo de prueba para verificar la configuración SMTP.")
     a.set_defaults(func=cmd_correo_probar)
+
+    # web
+    pw = sub.add_parser("web", help="Inicia la interfaz web (requiere Flask instalado).")
+    pw.add_argument("--host", default="127.0.0.1", help="Dirección donde escuchar (default 127.0.0.1, solo esta compu).")
+    pw.add_argument("--port", type=int, default=5000, help="Puerto (default 5000).")
+    pw.add_argument("--debug", action="store_true", help="Modo desarrollo (recarga automática).")
+    pw.set_defaults(func=cmd_web)
 
     # exportar
     pe = sub.add_parser("exportar", help="Exportar información a CSV, separada por rubro.")

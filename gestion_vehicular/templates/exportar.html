@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titulo %}Exportar / Correo — Gestión Vehicular{% endblock %}
+{% block contenido %}
+<h1>Exportar a CSV</h1>
+<p class="ayuda">Cada rubro se descarga en su propio archivo (se abre directo en Excel).</p>
+<div class="grid-links">
+  {% for rubro, etiqueta in rubros.items() %}
+  <a href="{{ url_for('exportar_rubro', rubro=rubro) }}">⬇ {{ etiqueta }}</a>
+  {% endfor %}
+</div>
+
+<h1 style="margin-top:40px;">Correo</h1>
+<div class="panel">
+  {% if correo_configurado %}
+    <p>Configuración SMTP detectada. Remitente: <strong>{{ remitente }}</strong> ·
+       Destinatarios: <strong>{{ destinatarios }}</strong></p>
+  {% else %}
+    <p>El correo <strong>no está configurado</strong>. Definí las variables de entorno antes de iniciar
+      la aplicación (<code>GV_SMTP_HOST</code>, <code>GV_SMTP_USER</code>, <code>GV_SMTP_PASS</code>,
+      <code>GV_SMTP_TO</code>, ...). Ver el README para el detalle completo.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('correo_probar') }}">
+    <button type="submit" class="btn-primary">✉ Enviar correo de prueba</button>
+  </form>
+</div>
+{% endblock %}

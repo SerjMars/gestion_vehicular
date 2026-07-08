@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Alertas — Gestión Vehicular{% endblock %}
+{% block contenido %}
+<h1>Tablero de alertas</h1>
+
+<form method="get" class="form-inline">
+  <label>Horizonte (días)
+    <input type="number" name="dias" value="{{ dias }}" min="1">
+  </label>
+  <label>Umbral de mantenimiento (km)
+    <input type="number" name="umbral_km" value="{{ umbral_km }}" min="1">
+  </label>
+  <button type="submit">Actualizar</button>
+</form>
+
+<form method="post" action="{{ url_for('alertas_enviar') }}" class="form-inline">
+  <input type="hidden" name="dias" value="{{ dias }}">
+  <input type="hidden" name="umbral_km" value="{{ umbral_km }}">
+  <button type="submit" class="btn-primary">✉ Enviar este tablero por correo</button>
+  {% if not correo_configurado %}
+    <span class="ayuda" style="margin:0;">
+      El correo no está configurado — ver <a href="{{ url_for('exportar_pagina') }}">Exportar / Correo</a>.
+    </span>
+  {% endif %}
+</form>
+
+<div class="panel">
+  {{ fragmento | safe }}
+</div>
+{% endblock %}

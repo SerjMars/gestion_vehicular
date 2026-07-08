@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block titulo %}Vehículos — Gestión Vehicular{% endblock %}
+{% block contenido %}
+<h1>Vehículos</h1>
+
+<form method="get" class="form-inline">
+  <label>Sucursal
+    <select name="sucursal_id" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for s in sucursales %}
+      <option value="{{ s.id }}" {% if sucursal_id == s.id %}selected{% endif %}>{{ s.nombre }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<div class="tabla-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Sucursal</th><th>Tipo</th><th>Energía</th><th>Marca</th><th>Modelo</th>
+        <th>Año</th><th>Placas</th><th>Km actual</th><th>Actualizar km</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.id }}</td><td>{{ f.sucursal }}</td><td>{{ f.tipo }}</td><td>{{ f.energia }}</td>
+        <td>{{ f.marca }}</td><td>{{ f.modelo }}</td><td>{{ f.anio or "-" }}</td>
+        <td>{{ f.placas or "-" }}</td><td>{{ "{:,}".format(f.km_actual) }}</td>
+        <td>
+          <form method="post" action="{{ url_for('vehiculo_km', vehiculo_id=f.id) }}" class="form-inline" style="margin:0;">
+            <input type="number" name="km" value="{{ f.km_actual }}" min="0" style="width:100px;">
+            <button type="submit" class="btn-sm">Guardar</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10">Sin vehículos todavía.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Nuevo vehículo</h2>
+<form method="post" class="panel form-grid">
+  <label>Sucursal *
+    <select name="sucursal_id" required>
+      {% for s in sucursales %}
+      <option value="{{ s.id }}">{{ s.nombre }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Tipo *
+    <select name="tipo" required>
+      {% for t in tipos %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Energía
+    <select name="energia">
+      {% for e in energias %}<option value="{{ e }}" {% if e == "combustion" %}selected{% endif %}>{{ e }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Marca *<input type="text" name="marca" required></label>
+  <label>Modelo *<input type="text" name="modelo" required></label>
+  <label>Año<input type="number" name="anio" min="1990" max="2100"></label>
+  <label>Placas<input type="text" name="placas"></label>
+  <label>Número de serie<input type="text" name="num_serie"></label>
+  <label>Km actual<input type="number" name="km_actual" value="0" min="0"></label>
+  <button type="submit" class="btn-primary">Crear vehículo</button>
+</form>
+{% endblock %}
