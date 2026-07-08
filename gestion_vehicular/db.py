@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS vehiculos (
     placas      TEXT UNIQUE,
     num_serie   TEXT,                   -- NIV / número de serie
     km_actual   INTEGER NOT NULL DEFAULT 0,
+    energia     TEXT NOT NULL DEFAULT 'combustion',  -- combustion | hibrido | electrico
     activo      INTEGER NOT NULL DEFAULT 1
 );
 
@@ -107,6 +108,24 @@ def conectar(ruta: str | None = None) -> sqlite3.Connection:
 
 
 def inicializar(conexion: sqlite3.Connection) -> None:
-    """Crea las tablas e índices si no existen."""
+    """Crea las tablas e índices si no existen y migra bases anteriores."""
     conexion.executescript(ESQUEMA)
+    _migrar(conexion)
     conexion.commit()
+
+
+def _columnas(conexion: sqlite3.Connection, tabla: str) -> set[str]:
+    return {fila["name"] for fila in conexion.execute(f"PRAGMA table_info({tabla})")}
+
+
+def _migrar(conexion: sqlite3.Connection) -> None:
+    """Aplica cambios de esquema sobre bases de datos creadas con versiones previas.
+
+    Es idempotente: solo agrega lo que falta. Así, quien ya tenía datos cargados
+    no los pierde al actualizar el programa.
+    """
+    # v1 -> v1.1: columna de energía en vehículos (para eléctricos/híbridos).
+    if "energia" not in _columnas(conexion, "vehiculos"):
+        conexion.execute(
+            "ALTER TABLE vehiculos ADD COLUMN energia TEXT NOT NULL DEFAULT 'combustion'"
+        )

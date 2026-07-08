@@ -13,12 +13,13 @@ Ejemplos rápidos:
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 import sys
 
-from . import catalogos, repositorio as repo
+from . import catalogos, exportar, repositorio as repo
 from .db import RUTA_DB_POR_DEFECTO, conectar, inicializar
-from .formato import money, tabla
+from .formato import money, render_alertas, tabla
 
 
 # --------------------------------------------------------------------------- #
@@ -59,17 +60,20 @@ def cmd_sucursal_list(con, args):
 def cmd_vehiculo_add(con, args):
     if args.tipo not in catalogos.TIPOS_VEHICULO:
         print(f"Aviso: tipo '{args.tipo}' no está en {catalogos.TIPOS_VEHICULO}.", file=sys.stderr)
+    if args.energia not in catalogos.TIPOS_ENERGIA:
+        print(f"Aviso: energía '{args.energia}' no está en {catalogos.TIPOS_ENERGIA}.", file=sys.stderr)
     vid = repo.crear_vehiculo(con, args.sucursal, args.tipo, args.marca, args.modelo,
-                              args.anio, args.placas, args.serie, args.km)
-    print(f"Vehículo creado (id={vid}): {args.marca} {args.modelo} [{args.placas or 's/placas'}]")
+                              args.anio, args.placas, args.serie, args.km, args.energia)
+    print(f"Vehículo creado (id={vid}): {args.marca} {args.modelo} "
+          f"[{args.placas or 's/placas'}] ({args.energia})")
 
 
 def cmd_vehiculo_list(con, args):
     filas = repo.listar_vehiculos(con, sucursal_id=args.sucursal)
     print(tabla(
-        ["ID", "Sucursal", "Tipo", "Marca", "Modelo", "Año", "Placas", "Km"],
-        [[f["id"], f["sucursal"], f["tipo"], f["marca"], f["modelo"], f["anio"],
-          f["placas"], f["km_actual"]] for f in filas],
+        ["ID", "Sucursal", "Tipo", "Energía", "Marca", "Modelo", "Año", "Placas", "Km"],
+        [[f["id"], f["sucursal"], f["tipo"], f["energia"], f["marca"], f["modelo"],
+          f["anio"], f["placas"], f["km_actual"]] for f in filas],
     ))
 
 
@@ -162,50 +166,45 @@ def cmd_obl_pagar(con, args):
 
 # ---- Tablero de alertas ---- #
 
-def _etiqueta_dias(d: int) -> str:
-    if d < 0:
-        return f"VENCIDO hace {-d} d"
-    if d == 0:
-        return "vence HOY"
-    return f"en {d} d"
-
-
 def cmd_alertas(con, args):
     a = repo.calcular_alertas(con, dias=args.dias, umbral_km=args.umbral_km)
-
-    print("=" * 72)
-    print(f" TABLERO DE ALERTAS  —  horizonte {a['dias']} días / {a['umbral_km']:,} km")
-    print("=" * 72)
-
-    print("\n▸ DERECHOS, PERMISOS Y LICENCIAS (pendientes de pago/renovación)")
-    print(tabla(
-        ["ID", "Tipo", "Aplica a", "Sucursal", "Vence", "Estado", "Monto"],
-        [[o["id"], o["tipo"], o["placas"] or o["conductor"] or "-", o["sucursal"],
-          o["fecha_vencimiento"], _etiqueta_dias(o["dias_restantes"]), money(o["monto"])]
-         for o in a["obligaciones"]],
-    ))
-
-    print("\n▸ MANTENIMIENTOS PRÓXIMOS (por fecha)")
-    print(tabla(
-        ["Veh", "Placas", "Vehículo", "Sucursal", "Tipo", "Próx.fecha", "Estado"],
-        [[m["vehiculo_id"], m["placas"], f"{m['marca']} {m['modelo']}", m["sucursal"],
-          m["tipo"], m["proximo_fecha"], _etiqueta_dias(m["dias_restantes"])]
-         for m in a["mant_fecha"]],
-    ))
-
-    print("\n▸ MANTENIMIENTOS PRÓXIMOS (por kilometraje)")
-    print(tabla(
-        ["Veh", "Placas", "Vehículo", "Sucursal", "Tipo", "Km actual", "Próx.km", "Faltan"],
-        [[m["vehiculo_id"], m["placas"], f"{m['marca']} {m['modelo']}", m["sucursal"],
-          m["tipo"], f"{m['km_actual']:,}", f"{m['proximo_km']:,}",
-          ("VENCIDO" if m["km_restantes"] < 0 else f"{m['km_restantes']:,} km")]
-         for m in a["mant_km"]],
-    ))
-
+    texto = render_alertas(a)
     total = len(a["obligaciones"]) + len(a["mant_fecha"]) + len(a["mant_km"])
-    print("\n" + "-" * 72)
-    print(f" {total} punto(s) requieren atención." if total else " Todo al día. ✓")
-    print("-" * 72)
+
+    enviar = args.email or args.solo_email
+    if not args.solo_email:
+        print(texto)
+
+    if enviar:
+        from . import correo
+        try:
+            destinatarios = correo.enviar_alertas(texto, total)
+            print(f"\n✉  Alertas enviadas por correo a: {', '.join(destinatarios)}")
+        except correo.CorreoNoConfigurado as e:
+            print(f"No se pudo enviar el correo: {e}", file=sys.stderr)
+            return 1
+        except Exception as e:  # errores de SMTP/red
+            print(f"Falló el envío de correo: {e}", file=sys.stderr)
+            return 1
+
+
+# ---- Exportación por rubro ---- #
+
+def cmd_exportar(con, args):
+    rubros = exportar.RUBROS if args.rubro == "todo" else [args.rubro]
+
+    if len(rubros) == 1 and args.salida:
+        encabezados, filas = exportar.datos_por_rubro(con, rubros[0])
+        exportar.escribir_csv(args.salida, encabezados, filas)
+        print(f"Exportado '{rubros[0]}' ({len(filas)} filas) → {args.salida}")
+        return
+
+    os.makedirs(args.dir, exist_ok=True)
+    for rubro in rubros:
+        encabezados, filas = exportar.datos_por_rubro(con, rubro)
+        ruta = os.path.join(args.dir, exportar.nombre_por_defecto(rubro))
+        exportar.escribir_csv(ruta, encabezados, filas)
+        print(f"Exportado '{rubro}' ({len(filas)} filas) → {ruta}")
 
 
 # --------------------------------------------------------------------------- #
@@ -222,12 +221,22 @@ def construir_parser() -> argparse.ArgumentParser:
 
     # init / seed / alertas
     sub.add_parser("init", help="Crea la base de datos y las tablas.").set_defaults(func=cmd_init)
-    sub.add_parser("seed", help="Carga datos de ejemplo (6 sucursales con flota).").set_defaults(func=cmd_seed)
+    sub.add_parser("seed", help="Carga datos de ejemplo (6 sucursales + Corporativo con eléctricos).").set_defaults(func=cmd_seed)
 
     pa = sub.add_parser("alertas", help="Tablero: qué vence pronto (derechos, permisos, mantenimientos).")
     pa.add_argument("--dias", type=int, default=30, help="Horizonte de alerta en días (default 30).")
     pa.add_argument("--umbral-km", type=int, default=1000, help="Umbral de km para mantenimiento (default 1000).")
+    pa.add_argument("--email", action="store_true", help="Enviar el tablero por correo (ver config en gestion_vehicular/correo.py).")
+    pa.add_argument("--solo-email", action="store_true", help="Enviar por correo sin imprimir en pantalla (implica --email).")
     pa.set_defaults(func=cmd_alertas)
+
+    # exportar
+    pe = sub.add_parser("exportar", help="Exportar información a CSV, separada por rubro.")
+    pe.add_argument("--rubro", default="todo", choices=exportar.RUBROS + ["todo"],
+                    help="Rubro a exportar (default: todo, un archivo por rubro).")
+    pe.add_argument("--salida", help="Archivo CSV de salida (solo cuando se exporta un rubro).")
+    pe.add_argument("--dir", default=".", help="Carpeta destino cuando se exporta 'todo' (default: actual).")
+    pe.set_defaults(func=cmd_exportar)
 
     # sucursal
     ps = sub.add_parser("sucursal", help="Alta y listado de sucursales.").add_subparsers(dest="accion", required=True)
@@ -246,6 +255,8 @@ def construir_parser() -> argparse.ArgumentParser:
     a.add_argument("--marca", required=True); a.add_argument("--modelo", required=True)
     a.add_argument("--anio", type=int); a.add_argument("--placas")
     a.add_argument("--serie", help="NIV / número de serie"); a.add_argument("--km", type=int, default=0)
+    a.add_argument("--energia", default="combustion",
+                   help=f"{'|'.join(catalogos.TIPOS_ENERGIA)} (default combustion)")
     a.set_defaults(func=cmd_vehiculo_add)
     a = pv.add_parser("list")
     a.add_argument("--sucursal", type=int, help="Filtrar por sucursal.")

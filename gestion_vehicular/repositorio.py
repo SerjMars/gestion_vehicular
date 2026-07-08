@@ -61,11 +61,11 @@ def obtener_sucursal(con, sucursal_id) -> sqlite3.Row | None:
 # --------------------------------------------------------------------------- #
 
 def crear_vehiculo(con, sucursal_id, tipo, marca, modelo, anio=None,
-                   placas=None, num_serie=None, km_actual=0) -> int:
+                   placas=None, num_serie=None, km_actual=0, energia="combustion") -> int:
     cur = con.execute(
         "INSERT INTO vehiculos (sucursal_id, tipo, marca, modelo, anio, placas, "
-        "num_serie, km_actual) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (sucursal_id, tipo, marca, modelo, anio, placas, num_serie, km_actual),
+        "num_serie, km_actual, energia) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (sucursal_id, tipo, marca, modelo, anio, placas, num_serie, km_actual, energia),
     )
     con.commit()
     return cur.lastrowid
@@ -240,7 +240,7 @@ def calcular_alertas(con, dias=30, umbral_km=1000) -> dict:
     # Tomamos, por vehículo, el mantenimiento con la próxima fecha más cercana.
     filas_fecha = con.execute(
         """
-        SELECT m.*, v.placas, v.marca, v.modelo, s.nombre AS sucursal
+        SELECT m.*, v.placas, v.marca, v.modelo, v.energia, s.nombre AS sucursal
         FROM mantenimientos m
         JOIN vehiculos v  ON v.id = m.vehiculo_id
         JOIN sucursales s ON s.id = v.sucursal_id
@@ -259,7 +259,7 @@ def calcular_alertas(con, dias=30, umbral_km=1000) -> dict:
     # --- Mantenimientos por kilometraje ---
     filas_km = con.execute(
         """
-        SELECT m.*, v.placas, v.marca, v.modelo, v.km_actual, s.nombre AS sucursal
+        SELECT m.*, v.placas, v.marca, v.modelo, v.energia, v.km_actual, s.nombre AS sucursal
         FROM mantenimientos m
         JOIN vehiculos v  ON v.id = m.vehiculo_id
         JOIN sucursales s ON s.id = v.sucursal_id

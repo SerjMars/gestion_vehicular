@@ -3,13 +3,16 @@
 Herramienta de línea de comandos para gestionar, sobre una flota distribuida en
 varias sucursales, tres cosas:
 
-1. **Mantenimientos** de cada vehículo (por fecha y por kilometraje).
+1. **Mantenimientos** de cada vehículo (por fecha y por kilometraje), tanto de
+   combustión/híbridos como **eléctricos**.
 2. **Derechos y permisos**: tenencia, refrendo, verificación, tarjeta de
    circulación, placas, seguro (terminología de México).
 3. **Licencias de conductores** y su vigencia.
 
 El corazón de la herramienta es el comando **`alertas`**: un tablero que te dice,
-de un vistazo, qué está vencido o por vencer en toda la flota.
+de un vistazo, qué está vencido o por vencer en toda la flota, y que además
+puede **enviarse por correo**. La información se puede **exportar a CSV separada
+por rubro**.
 
 Está escrita en **Python + SQLite** sin dependencias externas (solo la librería
 estándar), y con la lógica separada de la interfaz para poder **migrarla a una
@@ -27,7 +30,7 @@ app web** más adelante reutilizando la base de datos y el código de negocio.
 # 1. Crear la base de datos
 python gv.py init
 
-# 2. (Opcional) Cargar datos de ejemplo: 6 sucursales con su flota
+# 2. (Opcional) Cargar datos de ejemplo: 6 sucursales + Corporativo (con eléctricos)
 python gv.py seed
 
 # 3. Ver el tablero de alertas
@@ -59,13 +62,23 @@ python gv.py sucursal list
 ### Vehículos
 
 ```bash
-# tipo: sedan | hatchback | pickup
+# tipo:    sedan | hatchback | pickup
+# energia: combustion (default) | hibrido | electrico
 python gv.py vehiculo add --sucursal 2 --tipo pickup --marca Ford --modelo Ranger \
     --anio 2022 --placas "DEF-22-01" --km 45000
+python gv.py vehiculo add --sucursal 7 --tipo pickup --marca Ford \
+    --modelo "F-150 Lightning" --energia electrico --placas "COR-00-02"
 python gv.py vehiculo list
 python gv.py vehiculo list --sucursal 2
 python gv.py vehiculo km --id 4 --km 48200      # actualizar odómetro
 ```
+
+La **energía** (combustión / híbrido / eléctrico) es independiente del tipo de
+carrocería, porque el mantenimiento cambia. Hoy los eléctricos viven solo en el
+Corporativo, pero el sistema ya los soporta: al registrar un mantenimiento podés
+usar tipos propios de EV (`bateria_hv`, `refrigerante_bateria`, `software`,
+`frenos_regenerativos`, `cargador_puerto`, `motor_inversor`, …). Ver la lista
+completa por energía en `gestion_vehicular/catalogos.py`.
 
 ### Conductores y licencias
 
@@ -113,6 +126,48 @@ Muestra tres bloques, ordenados por urgencia: obligaciones (derechos, permisos y
 licencias) pendientes vencidas o por vencer, mantenimientos próximos por fecha y
 mantenimientos próximos por kilometraje.
 
+### Alertas por correo
+
+El mismo tablero se puede enviar por correo. La configuración va en **variables
+de entorno** (no se guardan credenciales en el código ni en la base):
+
+```bash
+export GV_SMTP_HOST=smtp.gmail.com
+export GV_SMTP_USER=flota@empresa.com
+export GV_SMTP_PASS=xxxx-xxxx-xxxx-xxxx      # contraseña de aplicación
+export GV_SMTP_TO="gerencia@empresa.com, tu-correo@empresa.com"
+
+python gv.py alertas --email          # imprime y además envía
+python gv.py alertas --solo-email     # solo envía (ideal para tareas programadas)
+```
+
+Variables disponibles: `GV_SMTP_HOST` (obligatoria), `GV_SMTP_TO` (obligatoria),
+`GV_SMTP_PORT` (587), `GV_SMTP_USER`, `GV_SMTP_PASS`, `GV_SMTP_FROM`,
+`GV_SMTP_TLS` (1), `GV_SMTP_SSL` (0). Detalle completo en
+`gestion_vehicular/correo.py`.
+
+Para recibir el aviso automáticamente (por ejemplo, todos los lunes a las 8:00),
+se puede programar con `cron` en Linux/Mac:
+
+```cron
+0 8 * * 1  cd /ruta/al/proyecto && /usr/bin/python3 gv.py alertas --solo-email
+```
+
+### Exportar por rubro
+
+La información se exporta a CSV (se abre en Excel), **cada rubro en su propio
+archivo** para no mezclar mantenimientos con permisos:
+
+```bash
+python gv.py exportar --rubro todo --dir ./exportes     # un archivo por rubro
+python gv.py exportar --rubro mantenimientos --salida mantenimientos.csv
+python gv.py exportar --rubro permisos                  # derechos/permisos de vehículos
+python gv.py exportar --rubro licencias                 # licencias de conductores
+```
+
+Rubros: `sucursales`, `vehiculos`, `conductores`, `mantenimientos`, `permisos`
+(obligaciones de vehículos), `licencias` (obligaciones de conductores).
+
 ---
 
 ## Estructura del proyecto
@@ -120,13 +175,15 @@ mantenimientos próximos por kilometraje.
 ```
 gv.py                       Punto de entrada (python gv.py ...)
 gestion_vehicular/
-├── db.py                   Conexión y esquema SQLite (toda la persistencia)
+├── db.py                   Conexión, esquema SQLite y migraciones
 ├── repositorio.py          Acceso a datos + lógica de negocio (reutilizable)
-├── alertas   (en repositorio.calcular_alertas)
-├── catalogos.py            Terminología de México (editable)
+│                           (incluye calcular_alertas)
+├── catalogos.py            Terminología de México y tipos de mantenimiento (editable)
+├── correo.py               Envío de alertas por correo (SMTP)
+├── exportar.py             Exportación a CSV por rubro
 ├── cli.py                  Interfaz de línea de comandos (presentación)
-├── formato.py              Formato de tablas y montos
-└── seed.py                 Datos de ejemplo
+├── formato.py              Formato de tablas, montos y render del tablero
+└── seed.py                 Datos de ejemplo (incluye flota eléctrica del Corporativo)
 ```
 
 La separación en capas es intencional: `db.py` y `repositorio.py` no imprimen ni

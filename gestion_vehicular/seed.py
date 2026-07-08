@@ -34,6 +34,11 @@ def cargar_datos_ejemplo(con) -> None:
     ]
     ids_suc = [repo.crear_sucursal(con, *s) for s in sucursales]
 
+    # Corporativo (central): aquí viven los vehículos eléctricos de la empresa.
+    id_corp = repo.crear_sucursal(
+        con, "Corporativo (Central)", "Ciudad de México", "CDMX",
+        "Dirección General", "55-1000-0000")
+
     # --- Flota: cada sucursal tiene al menos una pickup ---
     # (sucursal_idx, tipo, marca, modelo, anio, placas, km_actual)
     flota = [
@@ -55,6 +60,18 @@ def cargar_datos_ejemplo(con) -> None:
     for idx, tipo, marca, modelo, anio, placas, km in flota:
         ids_veh.append(repo.crear_vehiculo(
             con, ids_suc[idx], tipo, marca, modelo, anio, placas, km_actual=km))
+
+    # --- Vehículos ELÉCTRICOS del Corporativo ---
+    # (tipo, marca, modelo, anio, placas, km, energia)
+    flota_corp = [
+        ("sedan",  "Tesla", "Model 3",         2024, "COR-00-01", 22000, "electrico"),
+        ("pickup", "Ford",  "F-150 Lightning", 2023, "COR-00-02", 34000, "electrico"),
+        ("sedan",  "Toyota","Prius",           2022, "COR-00-03", 51000, "hibrido"),
+    ]
+    ids_corp = []
+    for tipo, marca, modelo, anio, placas, km, energia in flota_corp:
+        ids_corp.append(repo.crear_vehiculo(
+            con, id_corp, tipo, marca, modelo, anio, placas, km_actual=km, energia=energia))
 
     # --- Conductores (uno por sucursal, con licencia) ---
     conductores = [
@@ -103,11 +120,32 @@ def cargar_datos_ejemplo(con) -> None:
             monto=monto, pagado=pagado,
             descripcion=None)
 
+    # --- Mantenimientos de la flota eléctrica del Corporativo ---
+    # (corp_idx, tipo, fecha, km, costo, taller, prox_fecha, prox_km)
+    mant_corp = [
+        (0, "software",             _f(-40), 20000, 0,    "Tesla Service", _f(150), None),
+        (0, "frenos_regenerativos", _f(-40), 20000, 1200, "Tesla Service", None,    45000),
+        (1, "bateria_hv",           _f(-60), 30000, 2500, "Ford EV",       _f(8),   50000),  # revisión próxima
+        (1, "refrigerante_bateria", _f(-60), 30000, 1800, "Ford EV",       _f(300), None),
+        (2, "cambio_aceite",        _f(-90), 47000, 1700, "Toyota",        _f(25),  57000),  # el híbrido sí lleva aceite
+    ]
+    for cidx, tipo, fecha, km, costo, taller, pf, pk in mant_corp:
+        repo.registrar_mantenimiento(
+            con, ids_corp[cidx], tipo, fecha, km=km, costo=costo, taller=taller,
+            proximo_fecha=pf, proximo_km=pk)
+
+    # Los eléctricos no pagan verificación de emisiones, pero sí tenencia/seguro.
+    repo.registrar_obligacion(
+        con, "seguro", _f(14), vehiculo_id=ids_corp[0], periodo="2026", monto=18900)
+    repo.registrar_obligacion(
+        con, "tenencia", _f(40), vehiculo_id=ids_corp[1], periodo="2026", monto=9800)
+
     # --- Licencias como obligación del conductor (renovación) ---
     for cid, (_, _, _, _, vig) in zip(ids_cond, conductores):
         repo.registrar_obligacion(
             con, "licencia", vig, conductor_id=cid, periodo="renovación",
             descripcion="Renovación de licencia de conducir")
 
-    print(f"Cargadas {len(sucursales)} sucursales, {len(flota)} vehículos, "
-          f"{len(conductores)} conductores.")
+    print(f"Cargadas {len(sucursales)} sucursales + Corporativo, "
+          f"{len(flota) + len(flota_corp)} vehículos "
+          f"({len(flota_corp)} eléctricos/híbridos), {len(conductores)} conductores.")
