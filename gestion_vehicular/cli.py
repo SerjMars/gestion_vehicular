@@ -19,7 +19,7 @@ import sys
 
 from . import catalogos, exportar, repositorio as repo
 from .db import RUTA_DB_POR_DEFECTO, conectar, inicializar
-from .formato import money, render_alertas, tabla
+from .formato import money, render_alertas, render_alertas_html, tabla
 
 
 # --------------------------------------------------------------------------- #
@@ -178,14 +178,30 @@ def cmd_alertas(con, args):
     if enviar:
         from . import correo
         try:
-            destinatarios = correo.enviar_alertas(texto, total)
-            print(f"\n✉  Alertas enviadas por correo a: {', '.join(destinatarios)}")
+            html = render_alertas_html(a)
+            destinatarios = correo.enviar_alertas(texto, total, cuerpo_html=html)
+            print(f"\n✉  Alertas enviadas por correo (texto + HTML) a: {', '.join(destinatarios)}")
         except correo.CorreoNoConfigurado as e:
             print(f"No se pudo enviar el correo: {e}", file=sys.stderr)
             return 1
         except Exception as e:  # errores de SMTP/red
             print(f"Falló el envío de correo: {e}", file=sys.stderr)
             return 1
+
+
+# ---- Correo: utilidades ---- #
+
+def cmd_correo_probar(con, args):
+    from . import correo
+    try:
+        destinatarios = correo.enviar_prueba()
+        print(f"✉  Correo de prueba enviado correctamente a: {', '.join(destinatarios)}")
+    except correo.CorreoNoConfigurado as e:
+        print(f"No se pudo enviar el correo de prueba: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:  # errores de SMTP/red
+        print(f"Falló el envío de correo: {e}", file=sys.stderr)
+        return 1
 
 
 # ---- Exportación por rubro ---- #
@@ -229,6 +245,11 @@ def construir_parser() -> argparse.ArgumentParser:
     pa.add_argument("--email", action="store_true", help="Enviar el tablero por correo (ver config en gestion_vehicular/correo.py).")
     pa.add_argument("--solo-email", action="store_true", help="Enviar por correo sin imprimir en pantalla (implica --email).")
     pa.set_defaults(func=cmd_alertas)
+
+    # correo
+    pco = sub.add_parser("correo", help="Utilidades de correo.").add_subparsers(dest="accion", required=True)
+    a = pco.add_parser("probar", help="Envía un correo de prueba para verificar la configuración SMTP.")
+    a.set_defaults(func=cmd_correo_probar)
 
     # exportar
     pe = sub.add_parser("exportar", help="Exportar información a CSV, separada por rubro.")

@@ -146,6 +146,20 @@ Variables disponibles: `GV_SMTP_HOST` (obligatoria), `GV_SMTP_TO` (obligatoria),
 `GV_SMTP_TLS` (1), `GV_SMTP_SSL` (0). Detalle completo en
 `gestion_vehicular/correo.py`.
 
+El correo se manda en dos formatos a la vez (multipart): **texto plano** y
+**HTML con colores según urgencia** — rojo lo vencido, naranja lo urgente
+(vence en ≤7 días o queda poco kilometraje) y ámbar el resto de lo que entra en
+el horizonte configurado. Cada cliente de correo (Gmail, Outlook, etc.) muestra
+la versión que sepa interpretar; si alguno no soporta HTML, cae al texto plano.
+
+Para probar que la configuración SMTP funciona sin tener que esperar a que algo
+venza, hay un comando de prueba que manda un correo simple a los mismos
+destinatarios:
+
+```bash
+python gv.py correo probar
+```
+
 Para recibir el aviso automáticamente (por ejemplo, todos los lunes a las 8:00),
 se puede programar con `cron` en Linux/Mac:
 
@@ -179,7 +193,7 @@ gestion_vehicular/
 ├── repositorio.py          Acceso a datos + lógica de negocio (reutilizable)
 │                           (incluye calcular_alertas)
 ├── catalogos.py            Terminología de México y tipos de mantenimiento (editable)
-├── correo.py               Envío de alertas por correo (SMTP)
+├── correo.py               Envío de alertas por correo (SMTP, texto + HTML) y correo de prueba
 ├── exportar.py             Exportación a CSV por rubro
 ├── cli.py                  Interfaz de línea de comandos (presentación)
 ├── formato.py              Formato de tablas, montos y render del tablero
